@@ -76,6 +76,9 @@ HARD_DISQUALIFY_PATTERNS = [
     r"\blooking for a role\b", r"\bcv\b", r"\bnot a direct buyer\b", r"\bjust learning\b",
     r"\bcan'?t really pay\b", r"\bintern(ship)?\b", r"\bportfolio compan",
     r"you have won", r"click here to claim",  # spam/phishing rows
+    r"buy followers", r"mostly researching the market", r"offshore dev team",
+    r"want to partner", r"curious about your pricing for benchmarking",
+    r"partner with us",  # vendor pitches / competitor scouting, not real leads
 ]
 
 POSITIVE_INTENT_PATTERNS = [
