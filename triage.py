@@ -152,17 +152,24 @@ def score_lead(row):
     if budget is not None and budget >= BUDGET_FLOOR:
         fit += 2
         reasons.append(f"+fit: budget >= ${BUDGET_FLOOR}/mo")
+    if not valid_email(row.get("email")):
+        fit -= 1
+        reasons.append("-fit: no valid email on file (can't actually contact them)")
     fit = max(0, min(5, fit))
 
     return intent, fit, False, reasons
 
 
-def recommend(intent, fit, disqualified):
+def recommend(intent, fit, disqualified, email_valid=True):
     if disqualified:
         return "Disqualify"
     total = intent + fit
     if total >= 7:
-        return "Contact Now"
+        # ponytail: a hard gate, not a scoring point — you cannot "partially" contact
+        # someone. No valid email means no route to Contact Now, however good the
+        # rest of the score is; a bad email otherwise only costs 1 fit point, which
+        # a lead with title+employees+budget all firing can absorb without noticing.
+        return "Contact Now" if email_valid else "Nurture"
     if total >= 3:
         return "Nurture"
     return "Disqualify"
@@ -182,7 +189,8 @@ def process(df: pd.DataFrame) -> pd.DataFrame:
     df = pd.concat([df, scored], axis=1)
     df["total_score"] = df["intent_score"] + df["fit_score"]
     df["recommendation"] = df.apply(
-        lambda r: recommend(r["intent_score"], r["fit_score"], r["disqualified"]), axis=1
+        lambda r: recommend(r["intent_score"], r["fit_score"], r["disqualified"], r["email_valid"]),
+        axis=1,
     )
     df["reasons"] = df["reasons"].apply(lambda rs: "; ".join(rs))
 
