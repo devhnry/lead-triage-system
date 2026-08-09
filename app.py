@@ -54,12 +54,13 @@ st.markdown(
     }
     [data-testid="stFileUploaderDropzoneInstructions"] svg { display: none; }
     /* Streamlit's text input / selectbox wrappers use an invisible border at rest
-       that snaps to solid black on focus -- same border in both states instead. */
+       that snaps to solid black on focus -- keep it visible and constant instead,
+       same border color whether focused or not. */
     div[data-testid="stTextInputRootElement"],
     div[data-testid="stTextInputRootElement"]:focus-within,
     div[data-testid="stSelectbox"] div:has(> input),
     div[data-testid="stSelectbox"] div:has(> input):focus-within {
-        border-color: transparent !important;
+        border-color: var(--border) !important;
     }
     [data-testid="stFileUploaderFile"] {
         border: 1px solid var(--border); border-radius: 4px; padding: 0.4rem 0.7rem;
