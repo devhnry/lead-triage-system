@@ -105,7 +105,7 @@ JUNK_TITLES = ["asdf", "test"]
 NON_BUYER_TITLES = ["student", "recruiter"]
 
 BUDGET_FLOOR = 2000  # ponytail: arbitrary min viable engagement size, tune per business
-EMPLOYEE_FIT_RANGE = (5, 100)  # sweet spot: too small = no budget, too big = needs enterprise sale
+EMPLOYEE_FIT_RANGE = (10, 100)  # sweet spot: too small = no budget, too big = needs enterprise sale
 
 
 def _matches_any(patterns, text):
