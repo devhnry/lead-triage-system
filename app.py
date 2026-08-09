@@ -45,6 +45,12 @@ st.markdown(
         border: 1px solid var(--border); border-radius: 4px; padding: 0.4rem 0.7rem;
         background: var(--surface); margin-top: 0.5rem;
     }
+    div[data-testid="stTextInput"] div[data-baseweb="input"] {
+        border: 1px solid var(--border) !important; border-radius: 4px; background: var(--surface);
+    }
+    div[data-testid="stTextInput"] div[data-baseweb="input"]:focus-within {
+        border-color: var(--ink) !important;
+    }
 
     /* stat tiles */
     .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
@@ -73,19 +79,32 @@ st.markdown(
         color: var(--ink); font-size: 0.72rem; font-weight: 600; display: flex;
         align-items: center; justify-content: center; }
 
-    .lead-row { display: grid; grid-template-columns: 2fr 1.6fr 1.4fr 1fr auto; gap: 0.75rem;
-        align-items: center; padding: 0.65rem 0.25rem; border-bottom: 1px solid var(--border); }
-    .lead-row.header { color: var(--muted); font-size: 0.74rem; text-transform: uppercase;
-        letter-spacing: 0.03em; padding-bottom: 0.5rem; }
-    .row-divider { border-bottom: 1px solid var(--border); margin: 0.3rem 0; }
+    .header-row { display: flex; color: var(--muted); font-size: 0.74rem; text-transform: uppercase;
+        letter-spacing: 0.03em; padding: 0 0.6rem 0.5rem 0.6rem; border-bottom: 1px solid var(--ink); }
+    .header-row > div { flex: 1; }
+
+    /* each data row is a keyed container -> stable class we can target for hover + the
+       full-row click overlay, without hardcoding one CSS rule per row. */
+    div[class*="st-key-row-"] {
+        position: relative; border-bottom: 1px solid var(--border); padding: 0.55rem 0.6rem;
+    }
+    div[class*="st-key-row-"]:hover { background: var(--row-hover); }
+    div[class*="st-key-row-"] div[data-testid="stButton"] {
+        position: absolute; inset: 0; margin: 0;
+    }
+    div[class*="st-key-row-"] div[data-testid="stButton"] button {
+        width: 100%; height: 100%; opacity: 0; cursor: pointer; border: none; padding: 0;
+    }
     .lead-name { font-weight: 600; font-size: 0.9rem; }
     .lead-title { color: var(--muted); font-size: 0.78rem; }
     .lead-notes { color: var(--muted); font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis;
         white-space: nowrap; }
-    .score-cell { display: flex; align-items: center; gap: 0.45rem; white-space: nowrap; }
+    .score-cell { display: flex; flex-direction: column; gap: 0.3rem; }
     .score-text { font-family: 'Newsreader', Georgia, serif; font-size: 0.95rem; }
-    .bar-track { width: 46px; height: 3px; border-radius: 2px; background: var(--border); flex: none; }
+    .bar-track { width: 56px; height: 3px; border-radius: 2px; background: var(--border); }
     .bar-fill { height: 3px; border-radius: 2px; background: var(--ink); }
+    .verdict-cell { display: flex; align-items: center; justify-content: space-between; }
+    .caret { color: var(--muted); font-size: 0.7rem; }
 
     .detail-card { background: var(--row-hover); border: 1px solid var(--border); border-radius: 4px;
         padding: 1.1rem 1.4rem; margin: 0.25rem 0 0.9rem 0; }
@@ -166,9 +185,21 @@ if uploaded:
             with st.popover("Scoring"):
                 st.markdown(SCORING_EXPLAINER)
 
-    choice = st.segmented_control(
-        "Filter", ["All", "Contact Now", "Nurture", "Disqualify"], default="All", label_visibility="collapsed",
-    )
+    filter_col, download_col = st.columns([3, 1], vertical_alignment="center")
+    with filter_col:
+        choice = st.segmented_control(
+            "Filter", ["All", "Contact Now", "Nurture", "Disqualify"], default="All", label_visibility="collapsed",
+        )
+    with download_col:
+        st.download_button(
+            "Download ranked CSV",
+            result.to_csv(index=False).encode("utf-8"),
+            "leads_ranked.csv",
+            "text/csv",
+            type="primary",
+            use_container_width=True,
+        )
+
     view = result if choice in (None, "All") else result[result["recommendation"] == choice]
     if search:
         q = search.lower()
@@ -184,9 +215,10 @@ if uploaded:
 
     st.caption(f"{len(view)} lead{'s' if len(view) != 1 else ''}")
 
+    COLS = [2, 1.6, 1.6, 1, 1.2]
     st.markdown(
-        '<div class="lead-row header"><div>Lead</div><div>Company</div><div>Notes</div>'
-        '<div>Score</div><div>Verdict</div></div>',
+        '<div class="header-row"><div>Lead</div><div>Company</div><div>Notes</div>'
+        '<div>Score</div><div>Recommendation</div></div>',
         unsafe_allow_html=True,
     )
 
@@ -195,26 +227,32 @@ if uploaded:
         name = cell(r["name"]) or "(no name)"
         initial = name[0].upper() if name != "(no name)" else "?"
         pill = PILL_CLASS.get(r["recommendation"], "pill-nurture")
-        row_cols = st.columns([2, 1.6, 1.4, 1, 1, 0.4], gap="small", vertical_alignment="center")
-        row_cols[0].markdown(
-            f'<div style="display:flex;align-items:center;gap:0.55rem">'
-            f'<div class="avatar">{initial}</div><div><div class="lead-name">{name}</div>'
-            f'<div class="lead-title">{cell(r["title"]) or "Not listed"}</div></div></div>',
-            unsafe_allow_html=True,
-        )
-        row_cols[1].markdown(f'<div class="lead-title">{cell(r["company"]) or "Not listed"}</div>', unsafe_allow_html=True)
-        row_cols[2].markdown(f'<div class="lead-notes">{cell(r["notes"])}</div>', unsafe_allow_html=True)
-        row_cols[3].markdown(
-            f'<div class="score-cell"><span class="bar-track"><span class="bar-fill" '
-            f'style="width:{r["score_100"] * 0.46}px;display:block"></span></span>'
-            f'<span class="score-text">{int(r["score_100"])}/100</span></div>',
-            unsafe_allow_html=True,
-        )
-        row_cols[4].markdown(f'<span class="pill {pill}">{r["recommendation"]}</span>', unsafe_allow_html=True)
         is_open = st.session_state.open_lead == idx
-        if row_cols[5].button("v" if not is_open else "^", key=f"tog-{idx}", type="secondary"):
-            st.session_state.open_lead = None if is_open else idx
-            st.rerun()
+
+        with st.container(key=f"row-{idx}"):
+            row_cols = st.columns(COLS, gap="small", vertical_alignment="center")
+            row_cols[0].markdown(
+                f'<div style="display:flex;align-items:center;gap:0.55rem">'
+                f'<div class="avatar">{initial}</div><div><div class="lead-name">{name}</div>'
+                f'<div class="lead-title">{cell(r["title"]) or "Not listed"}</div></div></div>',
+                unsafe_allow_html=True,
+            )
+            row_cols[1].markdown(f'<div class="lead-title">{cell(r["company"]) or "Not listed"}</div>', unsafe_allow_html=True)
+            row_cols[2].markdown(f'<div class="lead-notes">{cell(r["notes"])}</div>', unsafe_allow_html=True)
+            row_cols[3].markdown(
+                f'<div class="score-cell"><span class="score-text">{int(r["score_100"])}/100</span>'
+                f'<span class="bar-track"><span class="bar-fill" '
+                f'style="width:{r["score_100"] * 0.56}px;display:block"></span></span></div>',
+                unsafe_allow_html=True,
+            )
+            row_cols[4].markdown(
+                f'<div class="verdict-cell"><span class="pill {pill}">{r["recommendation"]}</span>'
+                f'<span class="caret">{"^" if is_open else "v"}</span></div>',
+                unsafe_allow_html=True,
+            )
+            if st.button(f"Toggle details for {name}", key=f"tog-{idx}"):
+                st.session_state.open_lead = None if is_open else idx
+                st.rerun()
 
         if is_open:
             reasons = [x.strip() for x in str(r["reasons"]).split(";") if x.strip()]
@@ -236,20 +274,10 @@ if uploaded:
                 </div>""",
                 unsafe_allow_html=True,
             )
-        st.markdown('<div class="row-divider"></div>', unsafe_allow_html=True)
 
     if len(view) > st.session_state.page_size:
         if st.button(f"Show {min(PAGE_SIZE, len(view) - st.session_state.page_size)} more", type="primary"):
             st.session_state.page_size += PAGE_SIZE
             st.rerun()
-
-    st.write("")
-    st.download_button(
-        "Download ranked CSV",
-        result.to_csv(index=False).encode("utf-8"),
-        "leads_ranked.csv",
-        "text/csv",
-        type="primary",
-    )
 else:
     st.info("Waiting for a CSV upload.")
