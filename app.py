@@ -57,14 +57,6 @@ st.markdown(
         border: 1px solid var(--border); border-radius: 4px; padding: 0.4rem 0.7rem;
         background: var(--surface); margin-top: 0.5rem;
     }
-    div[data-testid="stTextInput"] { border-radius: 4px; overflow: hidden; }
-    div[data-testid="stTextInput"] input {
-        border: 1px solid var(--border) !important; border-radius: 4px !important;
-        background: var(--surface) !important; padding: 0.5rem 0.7rem !important;
-    }
-    div[data-testid="stTextInput"] input:focus {
-        border-color: var(--ink) !important; outline: none !important; box-shadow: none !important;
-    }
 
     /* stat tiles */
     .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
@@ -152,7 +144,6 @@ st.markdown(
 uploaded = st.file_uploader("Lead export CSV", type="csv", label_visibility="collapsed")
 
 PILL_CLASS = {"Contact Now": "pill-contact", "Nurture": "pill-nurture", "Disqualify": "pill-disqualify"}
-PAGE_SIZE = 25  # fewer rows rendered per rerun = faster click round-trip
 
 SCORING_EXPLAINER = """
 **Guardrails first.** Non-buyers (students, recruiters, investors, spam/vendor pitches) and junk
@@ -226,24 +217,41 @@ if uploaded:
     view = result if choice in (None, "All") else result[result["recommendation"] == choice]
     if search:
         q = search.lower()
+        # filters the full matching set, not just whatever page happens to be showing
         haystack = (view["name"].fillna("") + " " + view["company"].fillna("") + " "
                     + view["notes"].fillna("") + " " + view["title"].fillna("")).str.lower()
         view = view[haystack.str.contains(q, regex=False)]
     view = view.reset_index(drop=True)
 
-    if "page_size" not in st.session_state:
-        st.session_state.page_size = PAGE_SIZE
+    if "page_num" not in st.session_state:
+        st.session_state.page_num = 1
     if "open_lead" not in st.session_state:
         st.session_state.open_lead = None
 
-    st.caption(f"{len(view)} lead{'s' if len(view) != 1 else ''}")
+    count_col, size_col = st.columns([3, 1])
+    count_col.caption(f"{len(view)} lead{'s' if len(view) != 1 else ''}")
+    with size_col:
+        page_size = st.selectbox(
+            "Per page", [10, 20, 30], index=0, key="page_size_select", label_visibility="collapsed",
+        )
+
+    # any change to what's being viewed snaps back to page 1, never stranding you
+    # on page 6 of a filtered set that only has 2 results.
+    query_sig = (choice, search, page_size)
+    if st.session_state.get("_query_sig") != query_sig:
+        st.session_state.page_num = 1
+        st.session_state._query_sig = query_sig
+
+    total_pages = max(1, -(-len(view) // page_size))  # ceil division
+    st.session_state.page_num = min(max(1, st.session_state.page_num), total_pages)
+    start = (st.session_state.page_num - 1) * page_size
 
     COLS = [1.5, 1.1, 2.8, 0.7, 1.1]  # Lead, Company, Notes, Score, Recommendation
     header_cols = st.columns(COLS, gap="small")
     for c, label in zip(header_cols, ["Lead", "Company", "Notes", "Score", "Recommendation"]):
         c.markdown(f'<div class="header-cell">{label}</div>', unsafe_allow_html=True)
 
-    shown = view.head(st.session_state.page_size)
+    shown = view.iloc[start:start + page_size]
     for idx, r in shown.iterrows():
         name = cell(r["name"]) or "(no name)"
         initial = name[0].upper() if name != "(no name)" else "?"
@@ -297,9 +305,20 @@ if uploaded:
                 unsafe_allow_html=True,
             )
 
-    if len(view) > st.session_state.page_size:
-        if st.button(f"Show {min(PAGE_SIZE, len(view) - st.session_state.page_size)} more", type="primary"):
-            st.session_state.page_size += PAGE_SIZE
-            st.rerun()
+    if total_pages > 1:
+        prev_col, mid_col, next_col = st.columns([1, 3, 1])
+        with prev_col:
+            if st.button("< Prev", disabled=st.session_state.page_num <= 1, use_container_width=True):
+                st.session_state.page_num -= 1
+                st.rerun()
+        mid_col.markdown(
+            f'<div style="text-align:center;color:var(--muted);padding-top:0.4rem">'
+            f'Page {st.session_state.page_num} of {total_pages}</div>',
+            unsafe_allow_html=True,
+        )
+        with next_col:
+            if st.button("Next >", disabled=st.session_state.page_num >= total_pages, use_container_width=True):
+                st.session_state.page_num += 1
+                st.rerun()
 else:
     st.info("Waiting for a CSV upload.")
