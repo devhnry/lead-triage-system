@@ -1,9 +1,21 @@
+import io
+
 import pandas as pd
 import streamlit as st
 
 from triage import process
 
 st.set_page_config(page_title="Lead Triage", layout="wide", initial_sidebar_state="collapsed")
+
+
+@st.cache_data(show_spinner=False)
+def load_and_score(file_bytes: bytes) -> pd.DataFrame:
+    # ponytail: Streamlit reruns the whole script on every click (row toggle,
+    # filter, search keystroke) — without caching, all 500+ rows get re-parsed
+    # and re-scored from scratch every single time. Cache key is the file's own
+    # bytes, so it only recomputes when a genuinely different file is uploaded.
+    raw = pd.read_csv(io.BytesIO(file_bytes))
+    return process(raw)
 
 # ---------- design system ----------
 # Plain black-on-white, no accent hue. Verdicts are told apart by weight/fill
@@ -140,7 +152,7 @@ st.markdown(
 uploaded = st.file_uploader("Lead export CSV", type="csv", label_visibility="collapsed")
 
 PILL_CLASS = {"Contact Now": "pill-contact", "Nurture": "pill-nurture", "Disqualify": "pill-disqualify"}
-PAGE_SIZE = 50
+PAGE_SIZE = 25  # fewer rows rendered per rerun = faster click round-trip
 
 SCORING_EXPLAINER = """
 **Guardrails first.** Non-buyers (students, recruiters, investors, spam/vendor pitches) and junk
@@ -171,8 +183,7 @@ def cell(v):
 
 
 if uploaded:
-    raw = pd.read_csv(uploaded)
-    result = process(raw)
+    result = load_and_score(uploaded.getvalue()).copy()
     result["score_100"] = (result["total_score"] * 10).astype(int)
 
     counts = result["recommendation"].value_counts()

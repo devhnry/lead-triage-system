@@ -135,26 +135,28 @@ def score_lead(row):
     budget = parse_budget(row.get("monthly_budget"))
     if budget is None:
         intent -= 1
-        reasons.append("-intent: no budget stated")
+        reasons.append("-intent: no budget stated (raw value: TBD/blank)")
     elif budget == 0:
         intent -= 2
         reasons.append("-intent: budget is $0")
     intent = max(0, min(5, intent))
 
     fit = 2  # neutral baseline
+    title_raw = str(row.get("title") or "").strip() or "not listed"
     if any(t in title for t in DECISION_MAKER_TITLES):
         fit += 1
-        reasons.append("+fit: decision-maker title (can approve a purchase)")
+        reasons.append(f"+fit: decision-maker title, can approve a purchase (title: {title_raw})")
     emp = parse_employees(row.get("employees"))
     if emp is not None and EMPLOYEE_FIT_RANGE[0] <= emp <= EMPLOYEE_FIT_RANGE[1]:
         fit += 1
-        reasons.append("+fit: employee count in target range")
+        reasons.append(f"+fit: employee count in target range (actual: {emp:g})")
     if budget is not None and budget >= BUDGET_FLOOR:
         fit += 2
-        reasons.append(f"+fit: budget >= ${BUDGET_FLOOR}/mo")
+        reasons.append(f"+fit: budget >= ${BUDGET_FLOOR}/mo (actual: ${budget:,.0f}/mo)")
     if not valid_email(row.get("email")):
         fit -= 1
-        reasons.append("-fit: no valid email on file (can't actually contact them)")
+        email_raw = row.get("email") or "blank"
+        reasons.append(f"-fit: no valid email on file, can't actually contact them (raw value: {email_raw})")
     fit = max(0, min(5, fit))
 
     return intent, fit, False, reasons
