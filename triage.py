@@ -75,6 +75,7 @@ HARD_DISQUALIFY_PATTERNS = [
     r"\bstudent\b", r"\bjournalist\b", r"\bnot a client\b", r"\bnot looking to buy\b",
     r"\blooking for a role\b", r"\bcv\b", r"\bnot a direct buyer\b", r"\bjust learning\b",
     r"\bcan'?t really pay\b", r"\bintern(ship)?\b", r"\bportfolio compan",
+    r"you have won", r"click here to claim",  # spam/phishing rows
 ]
 
 POSITIVE_INTENT_PATTERNS = [
@@ -87,7 +88,14 @@ NEGATIVE_INTENT_PATTERNS = [
     r"not sure who signs off", r"would need to loop in the team", r"budget not locked",
 ]
 
-AGENCY_FIT_PATTERN = r"\bagency\b|\bagencies\b"
+# decision-maker titles = can actually approve a purchase, regardless of company type.
+# ELI5: "agency" in the notes was a weak proxy for fit (271 non-agency leads describe the
+# same automation pain points) — job title is a stronger, more defensible signal.
+DECISION_MAKER_TITLES = [
+    "owner", "founder", "ceo", "coo", "cto", "vp", "head of", "director",
+    "managing partner", "managing director", "partner",
+]
+JUNK_TITLES = ["asdf", "test"]
 
 BUDGET_FLOOR = 2000  # ponytail: arbitrary min viable engagement size, tune per business
 EMPLOYEE_FIT_RANGE = (5, 100)  # sweet spot: too small = no budget, too big = needs enterprise sale
@@ -100,10 +108,13 @@ def _matches_any(patterns, text):
 def score_lead(row):
     """Returns (intent_score 0-5, fit_score 0-5, disqualified bool, reasons list)."""
     notes = str(row.get("notes") or "").lower()
+    title = str(row.get("title") or "").strip().lower()
     reasons = []
 
     if _matches_any(HARD_DISQUALIFY_PATTERNS, notes):
-        return 0, 0, True, ["notes indicate non-buyer (student/journalist/job-seeker/investor/etc.)"]
+        return 0, 0, True, ["notes indicate non-buyer (student/journalist/job-seeker/investor/spam/etc.)"]
+    if title in JUNK_TITLES:
+        return 0, 0, True, ["junk/test row (garbage title field)"]
 
     intent = 2  # neutral baseline
     if _matches_any(POSITIVE_INTENT_PATTERNS, notes):
@@ -122,9 +133,9 @@ def score_lead(row):
     intent = max(0, min(5, intent))
 
     fit = 2  # neutral baseline
-    if re.search(AGENCY_FIT_PATTERN, notes):
+    if any(t in title for t in DECISION_MAKER_TITLES):
         fit += 1
-        reasons.append("+fit: describes an agency (ICP)")
+        reasons.append("+fit: decision-maker title (can approve a purchase)")
     emp = parse_employees(row.get("employees"))
     if emp is not None and EMPLOYEE_FIT_RANGE[0] <= emp <= EMPLOYEE_FIT_RANGE[1]:
         fit += 1
