@@ -1,5 +1,6 @@
 """Smallest possible self-check: fails loudly if scoring logic breaks."""
-from triage import parse_budget, parse_employees, parse_date, score_lead, recommend
+import pandas as pd
+from triage import parse_budget, parse_employees, parse_date, score_lead, recommend, dedupe
 
 assert parse_budget("$8,000/mo") == 8000
 assert parse_budget("12k/mo") == 12000
@@ -29,5 +30,15 @@ hot_row = {
 intent, fit, dq, reasons = score_lead(hot_row)
 assert dq is False
 assert recommend(intent, fit, dq) == "Contact Now"
+
+dupe_df = pd.DataFrame([
+    {"lead_id": "L-1", "name": "Obi", "email": "obi@x.com", "notes": "hello, interested"},
+    {"lead_id": "L-1-dup", "name": "Obi", "email": "obi@x.com", "notes": "(duplicate submission) hello, interested"},
+    {"lead_id": "L-2", "name": "Ada", "email": "ada@x.com", "notes": "unrelated lead"},
+])
+deduped, merged = dedupe(dupe_df)
+assert merged == 1
+assert len(deduped) == 2
+assert deduped[deduped["lead_id"] == "L-1"]["notes"].iloc[0] == "hello, interested"  # kept the untagged copy
 
 print("all checks passed")

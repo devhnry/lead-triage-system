@@ -45,11 +45,12 @@ st.markdown(
         border: 1px solid var(--border); border-radius: 4px; padding: 0.4rem 0.7rem;
         background: var(--surface); margin-top: 0.5rem;
     }
-    div[data-testid="stTextInput"] div[data-baseweb="input"] {
-        border: 1px solid var(--border) !important; border-radius: 4px; background: var(--surface);
+    div[data-testid="stTextInput"] input {
+        border: 1px solid var(--border) !important; border-radius: 4px !important;
+        background: var(--surface) !important; padding: 0.5rem 0.7rem !important;
     }
-    div[data-testid="stTextInput"] div[data-baseweb="input"]:focus-within {
-        border-color: var(--ink) !important;
+    div[data-testid="stTextInput"] input:focus {
+        border-color: var(--ink) !important; outline: none !important; box-shadow: none !important;
     }
 
     /* stat tiles */
@@ -79,9 +80,8 @@ st.markdown(
         color: var(--ink); font-size: 0.72rem; font-weight: 600; display: flex;
         align-items: center; justify-content: center; }
 
-    .header-row { display: flex; color: var(--muted); font-size: 0.74rem; text-transform: uppercase;
-        letter-spacing: 0.03em; padding: 0 0.6rem 0.5rem 0.6rem; border-bottom: 1px solid var(--ink); }
-    .header-row > div { flex: 1; }
+    .header-cell { color: var(--muted); font-size: 0.74rem; text-transform: uppercase;
+        letter-spacing: 0.03em; padding-bottom: 0.5rem; border-bottom: 1px solid var(--ink); }
 
     /* each data row is a keyed container -> stable class we can target for hover + the
        full-row click overlay, without hardcoding one CSS rule per row. */
@@ -89,12 +89,14 @@ st.markdown(
         position: relative; border-bottom: 1px solid var(--border); padding: 0.55rem 0.6rem;
     }
     div[class*="st-key-row-"]:hover { background: var(--row-hover); }
-    div[class*="st-key-row-"] div[data-testid="stButton"] {
-        position: absolute; inset: 0; margin: 0;
+    /* target the native <button> directly rather than a guessed wrapper testid,
+       which drifts across Streamlit versions and silently fails to match. */
+    div[class*="st-key-row-"] button {
+        position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important;
+        opacity: 0 !important; cursor: pointer !important; border: none !important;
+        padding: 0 !important; margin: 0 !important; min-height: 0 !important;
     }
-    div[class*="st-key-row-"] div[data-testid="stButton"] button {
-        width: 100%; height: 100%; opacity: 0; cursor: pointer; border: none; padding: 0;
-    }
+    div[class*="st-key-row-"] div:has(> button) { margin: 0 !important; padding: 0 !important; min-height: 0 !important; }
     .lead-name { font-weight: 600; font-size: 0.9rem; }
     .lead-title { color: var(--muted); font-size: 0.78rem; }
     .lead-notes { color: var(--muted); font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis;
@@ -168,13 +170,17 @@ if uploaded:
     result["score_100"] = (result["total_score"] * 10).astype(int)
 
     counts = result["recommendation"].value_counts()
+    source_rows = result.attrs.get("source_rows", len(result))
+    duplicates_merged = result.attrs.get("duplicates_merged", 0)
     st.markdown('<div class="stat-row">', unsafe_allow_html=True)
     tiles = st.columns(4, gap="small")
-    stat_tile(tiles[0], len(result), "every row inspected")
+    stat_tile(tiles[0], source_rows, "every row inspected")
     stat_tile(tiles[1], int(counts.get("Contact Now", 0)), "worth contacting now", highlight=True)
     stat_tile(tiles[2], int(counts.get("Nurture", 0)), "promising, not ready")
     stat_tile(tiles[3], int(counts.get("Disqualify", 0)), "junk, non-buyers, or low fit")
     st.markdown("</div>", unsafe_allow_html=True)
+    if duplicates_merged:
+        st.caption(f"{duplicates_merged} resubmitted duplicate{'s' if duplicates_merged != 1 else ''} merged before scoring, {len(result)} unique leads evaluated.")
 
     head_l, head_r = st.columns([3, 2])
     head_l.markdown('<h2 class="section-title">Lead queue</h2>', unsafe_allow_html=True)
@@ -216,11 +222,9 @@ if uploaded:
     st.caption(f"{len(view)} lead{'s' if len(view) != 1 else ''}")
 
     COLS = [2, 1.6, 1.6, 1, 1.2]
-    st.markdown(
-        '<div class="header-row"><div>Lead</div><div>Company</div><div>Notes</div>'
-        '<div>Score</div><div>Recommendation</div></div>',
-        unsafe_allow_html=True,
-    )
+    header_cols = st.columns(COLS, gap="small")
+    for c, label in zip(header_cols, ["Lead", "Company", "Notes", "Score", "Recommendation"]):
+        c.markdown(f'<div class="header-cell">{label}</div>', unsafe_allow_html=True)
 
     shown = view.head(st.session_state.page_size)
     for idx, r in shown.iterrows():

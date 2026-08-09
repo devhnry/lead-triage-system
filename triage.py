@@ -177,8 +177,24 @@ def recommend(intent, fit, disqualified, email_valid=True):
 
 # ---------- pipeline ----------
 
-def process(df: pd.DataFrame) -> pd.DataFrame:
+def dedupe(df: pd.DataFrame):
+    """Collapse resubmitted leads (same email, submitted twice) into one row.
+    Real pattern in this data: identical row resubmitted with a fresh lead_id
+    (often '<id>-dup') and '(duplicate submission)' prefixed onto the notes.
+    Keeps the original over the tagged resubmission. Returns (deduped_df, merged_count).
+    """
     df = df.copy()
+    is_dup_tagged = df["notes"].fillna("").str.strip().str.lower().str.startswith("(duplicate submission)")
+    has_email = df["email"].apply(valid_email)
+    # rows without a usable email can't be matched to each other; give each its own key
+    key = df["email"].where(has_email, "row-" + df.index.astype(str))
+    ordered = df.assign(_key=key, _dup_tagged=is_dup_tagged).sort_values("_dup_tagged")
+    deduped = ordered.drop_duplicates(subset="_key", keep="first").drop(columns=["_key", "_dup_tagged"])
+    return deduped, len(df) - len(deduped)
+
+
+def process(df: pd.DataFrame) -> pd.DataFrame:
+    df, duplicates_merged = dedupe(df)
     df["created_clean"] = df["created"].apply(parse_date)
     df["employees_clean"] = df["employees"].apply(parse_employees)
     df["budget_clean"] = df["monthly_budget"].apply(parse_budget)
@@ -195,4 +211,6 @@ def process(df: pd.DataFrame) -> pd.DataFrame:
     df["reasons"] = df["reasons"].apply(lambda rs: "; ".join(rs))
 
     df = df.sort_values("total_score", ascending=False).reset_index(drop=True)
+    df.attrs["duplicates_merged"] = duplicates_merged
+    df.attrs["source_rows"] = duplicates_merged + len(df)
     return df
