@@ -28,7 +28,7 @@ st.markdown(
     .stApp { background: var(--bg); }
     [data-testid="stHeader"] { background: transparent; }
     .block-container { padding-top: 2rem; max-width: 1320px; }
-    body, .stApp, p, span, div, label { color: var(--ink); }
+    .stApp { color: var(--ink); }
 
     h1.page-title {
         font-family: 'Newsreader', Georgia, serif;
@@ -38,13 +38,17 @@ st.markdown(
     .page-caption { color: var(--muted); font-size: 0.95rem; margin-bottom: 1.5rem; width: 100%; }
 
     [data-testid="stFileUploaderDropzone"] {
-        background: var(--surface); border: 1px solid var(--ink); border-radius: 8px;
+        background: var(--surface); border: 1px solid var(--ink); border-radius: 4px;
     }
     [data-testid="stFileUploaderDropzoneInstructions"] svg { display: none; }
+    [data-testid="stFileUploaderFile"] {
+        border: 1px solid var(--border); border-radius: 4px; padding: 0.4rem 0.7rem;
+        background: var(--surface); margin-top: 0.5rem;
+    }
 
     /* stat tiles */
     .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
-        background: var(--border); border: 1px solid var(--border); border-radius: 8px;
+        background: var(--border); border: 1px solid var(--border); border-radius: 4px;
         overflow: hidden; margin: 1.75rem 0 2.25rem 0; width: 100%; }
     .stat-tile { background: var(--surface); padding: 1.15rem 1.4rem; }
     .stat-tile.highlight { background: var(--fill); }
@@ -73,16 +77,19 @@ st.markdown(
         align-items: center; padding: 0.65rem 0.25rem; border-bottom: 1px solid var(--border); }
     .lead-row.header { color: var(--muted); font-size: 0.74rem; text-transform: uppercase;
         letter-spacing: 0.03em; padding-bottom: 0.5rem; }
+    .row-divider { border-bottom: 1px solid var(--border); margin: 0.3rem 0; }
     .lead-name { font-weight: 600; font-size: 0.9rem; }
     .lead-title { color: var(--muted); font-size: 0.78rem; }
     .lead-notes { color: var(--muted); font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis;
         white-space: nowrap; }
+    .score-cell { display: flex; align-items: center; gap: 0.45rem; white-space: nowrap; }
     .score-text { font-family: 'Newsreader', Georgia, serif; font-size: 0.95rem; }
-    .bar-track { width: 46px; height: 3px; border-radius: 2px; background: var(--border); display: inline-block; margin-right: 0.4rem; }
+    .bar-track { width: 46px; height: 3px; border-radius: 2px; background: var(--border); flex: none; }
     .bar-fill { height: 3px; border-radius: 2px; background: var(--ink); }
 
-    .detail-card { background: var(--row-hover); border: 1px solid var(--border); border-radius: 8px;
+    .detail-card { background: var(--row-hover); border: 1px solid var(--border); border-radius: 4px;
         padding: 1.1rem 1.4rem; margin: 0.25rem 0 0.9rem 0; }
+    .detail-meta { color: var(--muted); font-size: 0.82rem; margin-bottom: 0.3rem; }
     .detail-notes { font-family: 'Newsreader', Georgia, serif; font-style: italic; font-size: 1rem;
         margin: 0.5rem 0 0.9rem 0; line-height: 1.5; }
     .reason-row { display: flex; justify-content: space-between; padding: 0.3rem 0;
@@ -98,8 +105,8 @@ st.markdown(
 st.markdown('<h1 class="page-title">Lead Triage</h1>', unsafe_allow_html=True)
 st.markdown(
     '<div class="page-caption">Upload a lead export CSV. Dates, employee counts, and budget get '
-    'normalized; each lead is scored for intent and fit from the notes, title, and email fields; '
-    'the ranked list comes back with a Contact Now / Nurture / Disqualify call and the reasons behind it.</div>',
+    'normalized. Each lead is scored for intent and fit from the notes, title, and email fields. '
+    'The ranked list comes back with a Contact Now / Nurture / Disqualify call and the reasons behind it.</div>',
     unsafe_allow_html=True,
 )
 
@@ -110,16 +117,16 @@ PAGE_SIZE = 50
 
 SCORING_EXPLAINER = """
 **Guardrails first.** Non-buyers (students, recruiters, investors, spam/vendor pitches) and junk
-rows are screened out before scoring even starts — score 0, always Disqualify.
+rows get screened out before scoring starts: score 0, always Disqualify.
 
-**Intent** — from the notes: buying language vs. hesitation, and whether a real budget number
-was given (TBD, $0, and a stated number all mean something different).
+**Intent**, from the notes: buying language vs. hesitation, and whether a real budget number was
+given (TBD, $0, and a stated number all mean something different).
 
-**Fit** — decision-maker title, employee count in the target band, budget above the floor, and a
-valid email on file. No valid email caps a lead at Nurture — you can't recommend contacting
-someone you have no way to reach, however good the rest of the score looks.
+**Fit**: decision-maker title, employee count in the target band, budget above the floor, and a
+valid email on file. No valid email caps a lead at Nurture; you can't recommend contacting someone
+you have no way to reach, however good the rest of the score looks.
 
-**Score** = intent + fit, scaled to /100. 70+ → Contact Now, 30–69 → Nurture, below 30 → Disqualify.
+**Score** = intent + fit, scaled to /100. 70+ is Contact Now, 30-69 is Nurture, below 30 is Disqualify.
 """
 
 
@@ -154,9 +161,9 @@ if uploaded:
     head_l.markdown('<h2 class="section-title">Lead queue</h2>', unsafe_allow_html=True)
     with head_r:
         c1, c2 = st.columns([3, 1])
-        search = c1.text_input("Search", placeholder="Search name, company, notes…", label_visibility="collapsed")
+        search = c1.text_input("Search", placeholder="Search name, company, notes...", label_visibility="collapsed")
         with c2:
-            with st.popover("Scoring ↴"):
+            with st.popover("Scoring"):
                 st.markdown(SCORING_EXPLAINER)
 
     choice = st.segmented_control(
@@ -184,7 +191,7 @@ if uploaded:
     )
 
     shown = view.head(st.session_state.page_size)
-    for _, r in shown.iterrows():
+    for idx, r in shown.iterrows():
         name = cell(r["name"]) or "(no name)"
         initial = name[0].upper() if name != "(no name)" else "?"
         pill = PILL_CLASS.get(r["recommendation"], "pill-nurture")
@@ -192,20 +199,21 @@ if uploaded:
         row_cols[0].markdown(
             f'<div style="display:flex;align-items:center;gap:0.55rem">'
             f'<div class="avatar">{initial}</div><div><div class="lead-name">{name}</div>'
-            f'<div class="lead-title">{cell(r["title"]) or "&mdash;"}</div></div></div>',
+            f'<div class="lead-title">{cell(r["title"]) or "Not listed"}</div></div></div>',
             unsafe_allow_html=True,
         )
-        row_cols[1].markdown(f'<div class="lead-title">{cell(r["company"]) or "&mdash;"}</div>', unsafe_allow_html=True)
+        row_cols[1].markdown(f'<div class="lead-title">{cell(r["company"]) or "Not listed"}</div>', unsafe_allow_html=True)
         row_cols[2].markdown(f'<div class="lead-notes">{cell(r["notes"])}</div>', unsafe_allow_html=True)
         row_cols[3].markdown(
-            f'<span class="bar-track"><span class="bar-fill" style="width:{r["score_100"] * 0.46}px;display:block"></span></span>'
-            f'<span class="score-text">{int(r["score_100"])}/100</span>',
+            f'<div class="score-cell"><span class="bar-track"><span class="bar-fill" '
+            f'style="width:{r["score_100"] * 0.46}px;display:block"></span></span>'
+            f'<span class="score-text">{int(r["score_100"])}/100</span></div>',
             unsafe_allow_html=True,
         )
         row_cols[4].markdown(f'<span class="pill {pill}">{r["recommendation"]}</span>', unsafe_allow_html=True)
-        is_open = st.session_state.open_lead == r["lead_id"]
-        if row_cols[5].button("▾" if not is_open else "▴", key=f"tog-{r['lead_id']}", type="secondary"):
-            st.session_state.open_lead = None if is_open else r["lead_id"]
+        is_open = st.session_state.open_lead == idx
+        if row_cols[5].button("v" if not is_open else "^", key=f"tog-{idx}", type="secondary"):
+            st.session_state.open_lead = None if is_open else idx
             st.rerun()
 
         if is_open:
@@ -213,17 +221,22 @@ if uploaded:
             reason_html = "".join(
                 f'<div class="reason-row"><span>{x.lstrip("+-").strip()}</span>'
                 f'<span class="{"reason-plus" if x.strip().startswith("+") else "reason-minus"}">'
-                f'{"+" if x.strip().startswith("+") else "&minus;"}</span></div>'
+                f'{"+" if x.strip().startswith("+") else "-"}</span></div>'
                 for x in reasons
             ) or '<div class="reason-row"><span>No notable signals either way</span></div>'
+            emp = cell(r["employees_clean"])
+            emp_txt = f"{int(float(emp))} employees" if emp else "employee count unknown"
+            budget = cell(r["budget_clean"])
+            budget_txt = f"${int(float(budget)):,}/mo" if budget else "budget unknown"
             st.markdown(
                 f"""<div class="detail-card">
                     <div class="detail-notes">&ldquo;{cell(r['notes'])}&rdquo;</div>
-                    <div class="lead-title">{cell(r['email']) or 'no email on file'}</div>
+                    <div class="detail-meta">{cell(r['email']) or 'no email on file'} &middot; {emp_txt} &middot; {budget_txt}</div>
                     {reason_html}
                 </div>""",
                 unsafe_allow_html=True,
             )
+        st.markdown('<div class="row-divider"></div>', unsafe_allow_html=True)
 
     if len(view) > st.session_state.page_size:
         if st.button(f"Show {min(PAGE_SIZE, len(view) - st.session_state.page_size)} more", type="primary"):
