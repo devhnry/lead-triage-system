@@ -96,6 +96,10 @@ DECISION_MAKER_TITLES = [
     "managing partner", "managing director", "partner",
 ]
 JUNK_TITLES = ["asdf", "test"]
+# every Student/Recruiter-titled row in this dataset is a non-buyer (job-seeker,
+# bootcamp grad, journalist, VC, recruiter pitching placements) — verified against
+# all unique notes for these titles, no exceptions found.
+NON_BUYER_TITLES = ["student", "recruiter"]
 
 BUDGET_FLOOR = 2000  # ponytail: arbitrary min viable engagement size, tune per business
 EMPLOYEE_FIT_RANGE = (5, 100)  # sweet spot: too small = no budget, too big = needs enterprise sale
@@ -115,6 +119,8 @@ def score_lead(row):
         return 0, 0, True, ["notes indicate non-buyer (student/journalist/job-seeker/investor/spam/etc.)"]
     if title in JUNK_TITLES:
         return 0, 0, True, ["junk/test row (garbage title field)"]
+    if title in NON_BUYER_TITLES:
+        return 0, 0, True, [f"non-buyer title ({title})"]
 
     intent = 2  # neutral baseline
     if _matches_any(POSITIVE_INTENT_PATTERNS, notes):
