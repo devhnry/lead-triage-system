@@ -45,6 +45,7 @@ st.markdown(
         border: 1px solid var(--border); border-radius: 4px; padding: 0.4rem 0.7rem;
         background: var(--surface); margin-top: 0.5rem;
     }
+    div[data-testid="stTextInput"] { border-radius: 4px; overflow: hidden; }
     div[data-testid="stTextInput"] input {
         border: 1px solid var(--border) !important; border-radius: 4px !important;
         background: var(--surface) !important; padding: 0.5rem 0.7rem !important;
@@ -88,15 +89,21 @@ st.markdown(
     div[class*="st-key-row-"] {
         position: relative; border-bottom: 1px solid var(--border); padding: 0.55rem 0.6rem;
     }
-    div[class*="st-key-row-"]:hover { background: var(--row-hover); }
-    /* target the native <button> directly rather than a guessed wrapper testid,
-       which drifts across Streamlit versions and silently fails to match. */
+    div[class*="st-key-row-"]:hover { background: var(--row-hover); cursor: pointer; }
+    /* Full-row click overlay: inset:0 alone stretches an absolutely positioned element to
+       its positioned ancestor's edges. Adding width/height:100% on top of that breaks it —
+       percentage height doesn't resolve against an auto-height ancestor, so don't mix the two. */
     div[class*="st-key-row-"] button {
-        position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important;
+        position: absolute !important; inset: 0 !important;
         opacity: 0 !important; cursor: pointer !important; border: none !important;
-        padding: 0 !important; margin: 0 !important; min-height: 0 !important;
+        padding: 0 !important; margin: 0 !important;
     }
-    div[class*="st-key-row-"] div:has(> button) { margin: 0 !important; padding: 0 !important; min-height: 0 !important; }
+    /* Streamlit sets position:relative on the button's own wrapper div, which becomes
+       its containing block instead of our row -- neutralize it so inset:0 above
+       resolves against the full row, not that tiny wrapper. */
+    div[class*="st-key-row-"] div[data-testid="stElementContainer"]:has(button) {
+        position: static !important;
+    }
     .lead-name { font-weight: 600; font-size: 0.9rem; }
     .lead-title { color: var(--muted); font-size: 0.78rem; }
     .lead-notes { color: var(--muted); font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis;
@@ -105,8 +112,7 @@ st.markdown(
     .score-text { font-family: 'Newsreader', Georgia, serif; font-size: 0.95rem; }
     .bar-track { width: 56px; height: 3px; border-radius: 2px; background: var(--border); }
     .bar-fill { height: 3px; border-radius: 2px; background: var(--ink); }
-    .verdict-cell { display: flex; align-items: center; justify-content: space-between; }
-    .caret { color: var(--muted); font-size: 0.7rem; }
+    .capped-note { color: var(--muted); font-size: 0.68rem; margin-top: 0.2rem; }
 
     .detail-card { background: var(--row-hover); border: 1px solid var(--border); border-radius: 4px;
         padding: 1.1rem 1.4rem; margin: 0.25rem 0 0.9rem 0; }
@@ -221,7 +227,7 @@ if uploaded:
 
     st.caption(f"{len(view)} lead{'s' if len(view) != 1 else ''}")
 
-    COLS = [2, 1.6, 1.6, 1, 1.2]
+    COLS = [1.5, 1.1, 2.8, 0.7, 1.1]  # Lead, Company, Notes, Score, Recommendation
     header_cols = st.columns(COLS, gap="small")
     for c, label in zip(header_cols, ["Lead", "Company", "Notes", "Score", "Recommendation"]):
         c.markdown(f'<div class="header-cell">{label}</div>', unsafe_allow_html=True)
@@ -249,9 +255,10 @@ if uploaded:
                 f'style="width:{r["score_100"] * 0.56}px;display:block"></span></span></div>',
                 unsafe_allow_html=True,
             )
+            capped = r["total_score"] >= 7 and r["recommendation"] == "Nurture" and not r["email_valid"]
+            capped_note = '<div class="capped-note">capped: no valid email</div>' if capped else ""
             row_cols[4].markdown(
-                f'<div class="verdict-cell"><span class="pill {pill}">{r["recommendation"]}</span>'
-                f'<span class="caret">{"^" if is_open else "v"}</span></div>',
+                f'<div><span class="pill {pill}">{r["recommendation"]}</span>{capped_note}</div>',
                 unsafe_allow_html=True,
             )
             if st.button(f"Toggle details for {name}", key=f"tog-{idx}"):
